@@ -1264,7 +1264,7 @@ nav .nav-inner button.active:after{
 }
 /* MATCH_NOW_PLAYING_TYPOGRAPHY */
 .tab#wifi,.tab#settings{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.tab#wifi .section-title h2,.tab#settings .section-title h2{font-size:16px;line-height:1.2;letter-spacing:-.018em;font-weight:720}
+.tab#wifi .section-title h2,.tab#settings .section-title h2{font-size:16px;line-height:1.2;letter-spacing:-.018em;font-weight:720}.tab#settings .section-title h2{text-transform:uppercase}
 .tab#wifi .label,.tab#settings .label{font-size:9px;line-height:1.2;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}
 .tab#wifi .value,.tab#settings .value{font-size:12px;line-height:1.3;letter-spacing:0;color:#ddd;font-weight:400}
 .tab#settings .settings-intro{font-size:10px;line-height:1.4;letter-spacing:.12em;color:#666b76}
