@@ -735,7 +735,16 @@ static bool runConnectedStream() {
       if (n > 0) {
         stats.bytesReceived += n;
         stats.lastReceiveMs = millis();
-        if (!ringWrite(networkIn, n)) vTaskDelay(pdMS_TO_TICKS(1));
+
+        // Never discard received PCM when the ring is temporarily full.
+        // Wait for playback to free enough space, then commit the entire TCP chunk.
+        while (!stopRequested && ringSize() > (AUDIO_RING_BYTES - (size_t)n)) {
+          vTaskDelay(pdMS_TO_TICKS(1));
+        }
+        if (!stopRequested) {
+          ringWrite(networkIn, n);
+        }
+
         if (!bufferStarted && ringSize() >= targetPrebufferBytes()) {
           bufferStarted = true;
           setReceiverState(RX_STREAMING);
