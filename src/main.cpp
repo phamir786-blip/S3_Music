@@ -556,7 +556,7 @@ static bool beginI2S(uint32_t sr, uint16_t ch, uint16_t bits) {
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 6,
     .dma_buf_len = 512,
-    .use_apll = true,            // ESP32-S3 supports APLL / precise PLL fractional clock
+    .use_apll = false,            // ESP32-S3 supports APLL / precise PLL fractional clock
     .tx_desc_auto_clear = true,  // Clear DMA on underrun automatically
     .fixed_mclk = 0
   };
