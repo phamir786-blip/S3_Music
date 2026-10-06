@@ -61,21 +61,12 @@ static constexpr uint32_t HTTP_HEADER_TIMEOUT_MS = 8000;
 static constexpr uint32_t STREAM_READ_TIMEOUT_MS = 15000;
 static constexpr uint32_t WAV_PARSE_MAX_BYTES = 4096;
 
-// 101-step Perceptual Logarithmic Volume Attenuation Curve (16-bit multipliers: 0 to 65536)
-// Provides studio-grade smooth volume taper from -60 dB to 0 dB (Bit-perfect at 100%)
-static const uint32_t LOG_VOL_TABLE[101] = {
-      0,    41,    43,    45,    48,    51,    53,    56,    60,    63,
-     67,    71,    75,    80,    84,    89,    95,   101,   107,   113,
-    120,   128,   135,   144,   153,   162,   172,   183,   194,   206,
-    219,   233,   247,   262,   279,   296,   314,   334,   355,   377,
-    400,   425,   452,   480,   510,   542,   576,   612,   651,   691,
-    735,   781,   830,   882,   938,   997,  1060,  1126,  1197,  1273,
-   1353,  1439,  1530,  1627,  1730,  1839,  1956,  2080,  2212,  2352,
-   2501,  2659,  2828,  3007,  3198,  3401,  3617,  3846,  4090,  4350,
-   4626,  4919,  5231,  5563,  5916,  6291,  6691,  7115,  7567,  8047,
-   8558,  9101,  9679, 10293, 10947, 11641, 12380, 13166, 14002, 14891,
-  65536 // 100% -> Bit-perfect unity bypass
-};
+// Simple 0-100% linear amplitude gain.
+// 0% = silence, 100% = unity gain (bit-perfect bypass).
+static inline uint32_t volumeMultiplier(uint8_t volume) {
+  if (volume >= 100) return 65536;
+  return ((uint32_t)volume * 65536UL) / 100UL;
+}
 
 enum StreamMode : uint8_t { STREAM_MODE_TCP = 0, STREAM_MODE_HTTP = 1 };
 enum ReceiverState : uint8_t {
@@ -104,7 +95,7 @@ struct Settings {
   uint16_t httpPort = HTTP_DEFAULT_PORT;
   StreamMode preferredMode = STREAM_MODE_TCP;
   bool autoFallback = true, autoReconnect = true, oledEnabled = false, streamEnabled = true;
-  uint16_t targetBufferMs = 500;
+  uint16_t targetBufferMs = 15;
   uint8_t volumePercent = 80;
 };
 
@@ -147,14 +138,13 @@ static void loadSettings() {
   settings.autoReconnect = preferences.getBool("autorecon", true);
   settings.oledEnabled = false; // OLED purged
   settings.streamEnabled = preferences.getBool("enabled", true);
-  settings.targetBufferMs = preferences.getUShort("buffer", 500);
+  settings.targetBufferMs = preferences.getUShort("buffer", 15);
   settings.volumePercent = preferences.getUChar("volume", 80);
   if (settings.volumePercent > 100) settings.volumePercent = 100;
   if (settings.phoneHost.length() == 0) settings.phoneHost = PHONE_HOST;
   if (settings.tcpPort == 0) settings.tcpPort = TCP_DEFAULT_PORT;
   if (settings.httpPort == 0) settings.httpPort = HTTP_DEFAULT_PORT;
-  if (settings.targetBufferMs < 80) settings.targetBufferMs = 80;
-  if (settings.targetBufferMs > 3000) settings.targetBufferMs = 3000;
+  if (settings.targetBufferMs != 15 && settings.targetBufferMs != 50 && settings.targetBufferMs != 150 && settings.targetBufferMs != 300) settings.targetBufferMs = 15;
 }
 
 static void saveSettings() {
@@ -178,7 +168,7 @@ static void resetSettings() {
   settings.preferredMode = STREAM_MODE_TCP;
   settings.autoFallback = true; settings.autoReconnect = true;
   settings.oledEnabled = false; settings.streamEnabled = true;
-  settings.targetBufferMs = 500;
+  settings.targetBufferMs = 15;
   settings.volumePercent = 80;
   preferences.begin("s3music", false); saveSettings();
 }
@@ -438,15 +428,10 @@ static bool readTcpFormatHeader() {
   }
 
   if (memcmp(header, "C3MS", 4) != 0) {
-    memcpy(tcpPrefetch, header, 4);
-    tcpPrefetchLen = 4;
-    streamFormat.sampleRate = DEFAULT_SAMPLE_RATE;
-    streamFormat.channels = DEFAULT_CHANNELS;
-    streamFormat.bitsPerSample = DEFAULT_BITS_PER_SAMPLE;
-    streamFormat.audioFormat = 1;
-    streamFormat.valid = true;
-    Serial.println("[TCP] Legacy raw PCM detected (Defaulting to Hi-Res 24-bit 96kHz)");
-    return true;
+    stats.lastError = "Missing C3MS format header";
+    streamFormat.valid = false;
+    Serial.println("[TCP] Rejected: missing C3MS format header");
+    return false;
   }
 
   if (!readExact(streamClient, header + 4, C3_FORMAT_HEADER_BYTES - 4, TCP_FORMAT_HEADER_TIMEOUT_MS)) {
@@ -480,16 +465,10 @@ static bool readTcpFormatHeader() {
     return true;
   }
 
-  // Preserve backwards compatibility
-  memcpy(tcpPrefetch, header, C3_FORMAT_HEADER_BYTES);
-  tcpPrefetchLen = C3_FORMAT_HEADER_BYTES;
-  streamFormat.sampleRate = DEFAULT_SAMPLE_RATE;
-  streamFormat.channels = DEFAULT_CHANNELS;
-  streamFormat.bitsPerSample = DEFAULT_BITS_PER_SAMPLE;
-  streamFormat.audioFormat = 1;
-  streamFormat.valid = true;
-  Serial.println("[TCP] Invalid C3MS header; treating bytes as legacy raw PCM");
-  return true;
+  stats.lastError = "Invalid C3MS format header";
+  streamFormat.valid = false;
+  Serial.println("[TCP] Rejected: invalid C3MS format header");
+  return false;
 }
 
 static bool connectRawTcp() {
@@ -628,7 +607,7 @@ static void playbackTask(void*) {
     // --- 16-BIT AUDIO PROCESSING ---
     if (streamFormat.bitsPerSample == 16) {
       if (volume < 100) {
-        uint32_t mult = LOG_VOL_TABLE[volume];
+        uint32_t mult = volumeMultiplier(volume);
         int16_t *samples = reinterpret_cast<int16_t*>(playbackIn);
         size_t sampleCount = n / sizeof(int16_t);
         for (size_t i = 0; i < sampleCount; ++i) {
@@ -650,7 +629,7 @@ static void playbackTask(void*) {
     }
     // --- 24-BIT HIGH-RESOLUTION AUDIO PROCESSING (Packed 3-Byte PCM -> 32-bit I2S Slot) ---
     else if (streamFormat.bitsPerSample == 24) {
-      uint32_t mult = (volume < 100) ? LOG_VOL_TABLE[volume] : 65536;
+      uint32_t mult = (volume < 100) ? volumeMultiplier(volume) : 65536;
       if (streamFormat.channels == 2) {
         // Stereo: 6 bytes per frame (3 Left, 3 Right) -> 8 bytes out (32-bit L, 32-bit R)
         size_t frameCount = n / 6;
@@ -699,7 +678,7 @@ static void playbackTask(void*) {
 
       // 2. Volume attenuation loop (optional inner check)
       if (volume < 100) {
-        uint32_t mult = LOG_VOL_TABLE[volume];
+        uint32_t mult = volumeMultiplier(volume);
         for (size_t i = 0; i < sampleCount32; ++i) {
           samples32[i] = (int32_t)(((int64_t)samples32[i] * mult) >> 16);
         }
@@ -745,7 +724,16 @@ static bool runConnectedStream() {
       if (n > 0) {
         stats.bytesReceived += n;
         stats.lastReceiveMs = millis();
-        if (!ringWrite(networkIn, n)) vTaskDelay(pdMS_TO_TICKS(1));
+
+        // Never discard received PCM when the ring is temporarily full.
+        // Wait for playback to free enough space, then commit the entire TCP chunk.
+        while (!stopRequested && ringSize() > (AUDIO_RING_BYTES - (size_t)n)) {
+          vTaskDelay(pdMS_TO_TICKS(1));
+        }
+        if (!stopRequested) {
+          ringWrite(networkIn, n);
+        }
+
         if (!bufferStarted && ringSize() >= targetPrebufferBytes()) {
           bufferStarted = true;
           setReceiverState(RX_STREAMING);
@@ -987,7 +975,7 @@ input[type=range]::-moz-range-track{height:5px;background:linear-gradient(90deg,
 .status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}.stat{background:#090909;border:1px solid var(--line);border-radius:16px;padding:13px;min-height:76px}.stat .k{font-size:11px;color:var(--muted);margin-bottom:7px}.stat .v{font-size:17px;font-weight:760;overflow-wrap:anywhere}
 .file{width:100%;padding:12px;border:1px dashed var(--line2);border-radius:15px;background:#070707;color:#bbb}.file::file-selector-button{border:1px solid var(--line2);background:#151515;color:#fff;border-radius:10px;padding:8px 11px;margin-right:9px;font-weight:650}
 progress{width:100%;height:8px;accent-color:#fff;margin-top:12px}
-nav .nav-inner button{font-size:0;line-height:0;display:flex;align-items:center;justify-content:center;position:relative}nav .nav-inner button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}nav .nav-inner button:first-child svg{fill:currentColor;stroke:none;width:18px;height:18px}nav .nav-inner button.active:after{content:"";position:absolute;bottom:5px;left:50%;width:18px;height:2px;border-radius:2px;background:var(--accent);transform:translateX(-50%)} nav{position:fixed;z-index:40;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(0,0,0,.88);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+nav .nav-inner button{font-size:0;line-height:0;display:flex;align-items:center;justify-content:center;position:relative}nav .nav-inner button svg{width:40px;height:40px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}nav .nav-inner button:first-child svg{fill:currentColor;stroke:none;width:36px;height:36px}nav .nav-inner button.active:after{content:"";position:absolute;bottom:5px;left:50%;width:18px;height:2px;border-radius:2px;background:var(--accent);transform:translateX(-50%)} nav{position:fixed;z-index:40;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(0,0,0,.88);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
 nav .nav-inner{width:min(520px,100%);display:flex;gap:6px}nav button{flex:1;min-height:48px;border:0;border-radius:15px;background:transparent;color:#777;font-weight:700;cursor:pointer;transition:background .16s ease,color .16s ease,transform .16s ease}
 nav button.active{background:#151515;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}nav button:active{transform:scale(.97)}
 #toast{position:fixed;z-index:80;left:50%;bottom:88px;transform:translate(-50%,14px);opacity:0;pointer-events:none;background:#f2f2f2;color:#050505;border-radius:14px;padding:11px 15px;font-size:13px;font-weight:700;box-shadow:0 12px 30px rgba(0,0,0,.45);transition:opacity .18s ease,transform .18s ease;max-width:calc(100vw - 28px);text-align:center}
@@ -1272,6 +1260,17 @@ nav .nav-inner button.active:after{
 .small{
   font-size:11px;
 }
+/* MATCH_NOW_PLAYING_TYPOGRAPHY */
+.tab#wifi,.tab#settings{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.tab#wifi .section-title h2,.tab#settings .section-title h2{font-size:16px;line-height:1.2;letter-spacing:-.018em;font-weight:720}
+.tab#wifi .label,.tab#settings .label{font-size:9px;line-height:1.2;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}
+.tab#wifi .value,.tab#settings .value{font-size:12px;line-height:1.3;letter-spacing:0;color:#ddd;font-weight:400}
+.tab#settings .settings-intro{font-size:10px;line-height:1.4;letter-spacing:.12em;color:#666b76}
+.tab#settings .settings-intro strong{color:#f2f2f4;font-weight:800}
+.tab#settings .field label{font-size:9px;line-height:1.2;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}
+.tab#settings .select-button,.tab#settings .select-option,.tab#settings .switchrow>span,.tab#settings input[type=text],.tab#settings input[type=number],.tab#settings .file{font-size:12px;line-height:1.3;letter-spacing:0;font-weight:400}
+.tab#wifi button.action,.tab#settings button.action{font-size:9px;line-height:1.2;letter-spacing:.13em;font-weight:850;text-transform:uppercase}
+.tab#settings .small{font-size:10px;line-height:1.4;letter-spacing:0;color:#5f636d}
 @media(min-width:700px){
   main{padding-left:20px;padding-right:20px}
   .card{padding:22px}
@@ -1288,23 +1287,59 @@ nav .nav-inner button.active:after{
   .tab.active{animation:none}
   button.action:hover{transform:none}
 }
+/* NOW_PLAYING_CONTROL_DECK */
+.deck-card{padding:22px;background:radial-gradient(520px 220px at 50% -40px,rgba(196,215,255,.09),transparent 70%),linear-gradient(180deg,#111216,#090a0c);border-color:rgba(255,255,255,.12);box-shadow:0 18px 46px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.045)}
+.deck-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.deck-kicker{font-size:11px;letter-spacing:.2em;font-weight:850;color:#c9d6ee}.deck-sub{font-size:10px;letter-spacing:.12em;color:#666b76;margin-top:5px}.deck-status{margin-top:1px}
+.deck-state{font-size:clamp(31px,7vw,48px);font-weight:850;letter-spacing:-.055em;margin:30px 0 22px;line-height:1;color:#fff}
+.format-specs{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px}.format-spec{min-height:68px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);border-radius:17px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center}.format-spec strong{font-size:20px;line-height:1;font-weight:850;letter-spacing:-.035em}.format-spec span{display:block;font-size:9px;line-height:1.2;letter-spacing:.14em;color:#747984;font-weight:800;text-transform:uppercase;margin-top:7px}
+.deck-transport{display:flex;align-items:center;justify-content:center;gap:9px;color:#8d929d;font-size:11px;margin:16px 0 18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.deck-transport span:nth-child(2){color:#4f535c}
+.control-deck{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}.control-btn{min-height:82px;border:1px solid rgba(255,255,255,.09);border-radius:19px;background:#0d0e10;color:#b8bdc8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease}.control-btn:hover{transform:translateY(-1px);background:#14161a;border-color:rgba(255,255,255,.18)}.control-btn:active{transform:scale(.97)}.control-icon{font-size:23px;line-height:1;color:#e5e9f0}.control-btn span:last-child{font-size:9px;letter-spacing:.13em;font-weight:850}.control-btn.start{background:linear-gradient(180deg,#171a20,#0d0f12);border-color:rgba(196,215,255,.25);box-shadow:inset 0 0 20px rgba(196,215,255,.035)}.control-btn.start .control-icon{color:#d2e0ff}.control-btn.reconnect .control-icon{font-size:28px}
+.status-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;padding:11px 12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06);color:#747985;font-size:9px;letter-spacing:.05em}.status-strip span{display:flex;align-items:center;gap:6px;min-width:0}.status-strip b{color:#b7bcc6;font-size:9px;font-weight:750;white-space:nowrap}.status-strip i{width:6px;height:6px;border-radius:50%;background:#666;display:inline-block;box-shadow:0 0 8px rgba(255,255,255,.08)}.status-strip i.good{background:#bff6cb;box-shadow:0 0 9px rgba(191,246,203,.45)}.status-strip i.bad{background:#ffb7ae;box-shadow:0 0 9px rgba(255,183,174,.35)}
+.volume-deck{margin-top:12px}.volume-deck .slider-head h3,.stream-health-card .section-title h2{font-size:9px;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}.mini-tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;margin-bottom:14px}.mini-tile{margin:0;min-height:92px}.mini-label{font-size:9px;letter-spacing:.16em;color:#747984;font-weight:800}.mini-value{font-size:18px;font-weight:820;letter-spacing:-.03em;margin-top:9px}.mini-note{font-size:10px;color:#5f636d;margin-top:4px}
+@media(max-width:520px){.deck-card{padding:19px}.deck-state{margin:26px 0 19px}.format-spec{min-height:63px}.format-spec strong{font-size:20px}.control-btn{min-height:76px}.status-strip{font-size:8px;padding:10px 9px}.status-strip b{font-size:8px}.mini-tile{min-height:86px}}
+@media(max-width:390px){.status-strip{gap:5px}.status-strip span{gap:4px}.status-strip span:last-child{display:none}}
+/* END NOW_PLAYING_CONTROL_DECK */
 </style>
 </head>
 <body>
 <main>
 <section class="tab active" id="now">
-<div class="card"><div class="section-title"><h2>Now Playing</h2><span class="chip" id="deviceStatus">Loading</span></div><div class="hero" id="state">Connecting…</div><div class="format-line" id="format">Waiting for status</div><div class="info-strip"><span>PSRAM Buffer</span><strong id="bufferText">—</strong></div>
-<div class="card tight" style="margin:16px 0 0"><div class="slider-head"><h3>Volume</h3><span class="slider-value" id="volumeText">80%</span></div><div class="volume-row"><input id="volumeInput" type="range" min="0" max="100" value="80" oninput="volumePreview(this.value)" onchange="setVolume(this.value)"><button type="button" class="mute-btn" id="muteBtn" onclick="toggleMute()">Mute</button></div><div class="small">Output level (24-bit bit-perfect scale)</div></div>
-<div class="buttons"><button class="action" onclick="act('/api/stream/start')">Start</button><button class="action secondary" onclick="act('/api/stream/stop')">Stop</button><button class="action secondary" onclick="act('/api/stream/reconnect')">Reconnect</button></div></div>
-<div class="card"><div class="section-title"><h2>Stream</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17.5 3.5 14a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0l1.5 1.5M17 6.5 20.5 10a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5 0L12 15.5M8.5 15.5l7-7"/></svg></span></div><div class="row"><span class="label">Transport</span><span class="value" id="mode">—</span></div><div class="row"><span class="label">Source</span><span class="value" id="host">—</span></div><div class="row"><span class="label">Session</span><span class="value" id="session">—</span></div></div>
-<div class="card"><div class="section-title"><h2>Audio health</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 3 8 2-4h7"/></svg></span></div><div class="status-grid"><div class="stat"><div class="k">Underruns</div><div class="v" id="underruns">0</div></div><div class="stat"><div class="k">Reconnects</div><div class="v" id="reconnects">0</div></div></div><div class="row" style="margin-top:8px"><span class="label">Last error</span><span class="value" id="lastError">None</span></div></div>
+<div class="card deck-card">
+  <div class="deck-top"><div><div class="deck-kicker">NOW PLAYING</div><div class="deck-sub">S3 MUSIC RECEIVER</div></div><span class="chip deck-status" id="deviceStatus">Loading</span></div>
+  <div class="deck-state" id="state">Connecting…</div>
+  <div class="format-specs" aria-label="Current audio format">
+    <div class="format-spec"><strong id="formatBits">—</strong><span>BIT</span></div>
+    <div class="format-spec"><strong id="formatRate">—</strong><span>KHZ</span></div>
+    <div class="format-spec wide"><strong id="formatChannels">—</strong><span>CHANNELS</span></div>
+  </div>
+  <div class="deck-transport"><span id="mode">—</span><span>•</span><span id="host">—</span></div>
+  <div class="control-deck">
+    <button class="control-btn start" onclick="act('/api/stream/start')"><span class="control-icon">▶</span><span>START</span></button>
+    <button class="control-btn stop" onclick="act('/api/stream/stop')"><span class="control-icon">■</span><span>STOP</span></button>
+    <button class="control-btn reconnect" onclick="act('/api/stream/reconnect')"><span class="control-icon">↻</span><span>RECONNECT</span></button>
+  </div>
+  <div class="status-strip"><span><i id="connectionDot"></i><b id="connectionStatus">Checking connection</b></span><span><i id="bufferDot"></i><b id="bufferHealth">Buffer —</b></span><span>LATENCY <b id="latencyText">15 ms</b></span></div>
+</div>
+<div class="card tight volume-deck">
+  <div class="slider-head"><h3>Volume</h3><span class="slider-value" id="volumeText">80%</span></div>
+  <div class="volume-row"><input id="volumeInput" type="range" min="0" max="100" value="80" oninput="volumePreview(this.value)" onchange="setVolume(this.value)"><button type="button" class="mute-btn" id="muteBtn" onclick="toggleMute()">Mute</button></div>
+</div>
+<div class="mini-tile-grid">
+  <div class="card mini-tile"><div class="mini-label">BUFFER</div><div class="mini-value" id="bufferText">—</div><div class="mini-note">PSRAM ring</div></div>
+  <div class="card mini-tile"><div class="mini-label">SESSION</div><div class="mini-value" id="session">—</div><div class="mini-note">Current stream</div></div>
+</div>
+<div class="card stream-health-card">
+  <div class="section-title"><h2>Stream health</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 3 8 2-4h7"/></svg></span></div>
+  <div class="status-grid"><div class="stat"><div class="k">Underruns</div><div class="v" id="underruns">0</div></div><div class="stat"><div class="k">Reconnects</div><div class="v" id="reconnects">0</div></div></div>
+  <div class="row" style="margin-top:8px"><span class="label">Last error</span><span class="value" id="lastError">None</span></div>
+</div>
 </section>
 <section class="tab" id="wifi"><div class="card"><div class="section-title"><h2>Wi‑Fi</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9.5a12.5 12.5 0 0 1 16 0M7.2 13a7.5 7.5 0 0 1 9.6 0M10.3 16.2a2.8 2.8 0 0 1 3.4 0M12 19h.01"/></svg></span></div><div class="row"><span class="label">Status</span><span class="value" id="wifiStatus">—</span></div><div class="row"><span class="label">SSID</span><span class="value" id="ssid">—</span></div><div class="row"><span class="label">IP</span><span class="value" id="ip">—</span></div><div class="row"><span class="label">Hostname</span><span class="value">s3music.local</span></div><div class="row"><span class="label">Signal</span><span class="value" id="rssi">—</span></div><div class="buttons"><button class="action" onclick="act('/api/wifi/reconnect')">Reconnect Wi‑Fi</button></div></div></section>
 <section class="tab" id="settings">
 <div class="settings-intro"><strong>Settings</strong> · Connection, hardware, firmware and system controls</div>
 <div class="card"><div class="section-title"><h2>Stream settings</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17.5 3.5 14a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0l1.5 1.5M17 6.5 20.5 10a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5 0L12 15.5M8.5 15.5l7-7"/></svg></span></div><div class="field"><label>Phone host / IP</label><input id="hostInput" type="text" autocomplete="off"></div>
 <div class="field"><label>Preferred stream</label><div class="select-wrap" id="modeSelectWrap"><button type="button" class="select-button" id="modeSelectButton">Raw TCP PCM (24-bit 96k) — port 50005</button><div class="select-menu" role="listbox"><button type="button" class="select-option selected" data-value="tcp">Raw TCP PCM — port 50005</button><button type="button" class="select-option" data-value="http">HTTP WAV/PCM — port 8080</button></div><select id="modeInput" class="select-native" aria-hidden="true" tabindex="-1"><option value="tcp">Raw TCP PCM — port 50005</option><option value="http">HTTP WAV/PCM — port 8080</option></select></div></div>
-<div class="field"><label>TCP port</label><input id="tcpInput" type="number" min="1" max="65535"></div><div class="field"><label>HTTP port</label><input id="httpInput" type="number" min="1" max="65535"></div><div class="field"><label>Target buffer (ms)</label><input id="bufferInput" type="number" min="80" max="3000" step="50"></div>
+<div class="field"><label>TCP port</label><input id="tcpInput" type="number" min="1" max="65535"></div><div class="field"><label>HTTP port</label><input id="httpInput" type="number" min="1" max="65535"></div><div class="field"><label>Target buffer (ms)</label><div class="select-wrap" id="bufferSelectWrap"><button type="button" class="select-button" id="bufferSelectButton">15 ms</button><div class="select-menu" role="listbox"><button type="button" class="select-option selected" data-value="15">15 ms</button><button type="button" class="select-option" data-value="50">50 ms</button><button type="button" class="select-option" data-value="150">150 ms</button><button type="button" class="select-option" data-value="300">300 ms</button></div><select id="bufferInput" class="select-native" aria-hidden="true" tabindex="-1"><option value="15">15 ms</option><option value="50">50 ms</option><option value="150">150 ms</option><option value="300">300 ms</option></select></div></div>
 <div class="switchrow"><span>Automatic TCP/HTTP fallback</span><input class="switch" id="fallbackInput" type="checkbox"></div><div class="switchrow"><span>Automatic stream reconnect</span><input class="switch" id="autoreconnectInput" type="checkbox"></div><div class="buttons"><button class="action" onclick="saveCfg()">Save and reconnect</button></div></div>
 <div class="card"><div class="section-title"><h2>Hardware & Memory</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 7h6M9 17h6"/></svg></span></div><div class="row"><span class="label">SoC Architecture</span><span class="value">ESP32-S3 Dual-Core 240MHz</span></div><div class="row"><span class="label">Octal PSRAM</span><span class="value" id="psram">—</span></div><div class="row"><span class="label">Free Internal Heap</span><span class="value" id="heap">—</span></div><div class="row"><span class="label">Firmware</span><span class="value" id="version">—</span></div><div class="row"><span class="label">Audio Pipeline</span><span class="value">Core 1 DMA (Headless Hi-Fi)</span></div><div class="row"><span class="label">CPU temperature</span><span class="value" id="cpuTemp">—</span></div></div>
 <div class="card"><div class="section-title"><h2>Firmware OTA</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M6 15v4h12v-4"/></svg></span></div><p class="small">Select a .bin file. Streaming will stop during update.</p><input id="firmware" class="file" type="file" accept=".bin"><div class="buttons"><button class="action" id="otaBtn" onclick="uploadFw()">Install firmware</button></div><progress id="otaProg" class="hidden" value="0" max="100"></progress><div class="small" id="otaTxt"></div></div>
@@ -1323,26 +1358,27 @@ function toggleMute(){const input=$('volumeInput');if(!input)return;const curren
 async function sendVolume(v,commit){const n=Math.max(0,Math.min(100,Number(v)||0));const requestId=++volumeRequest;try{const body=new URLSearchParams({value:String(n),commit:commit?'1':'0'});const r=await fetch('/api/volume',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const d=await r.json();if(commit&&requestId===volumeRequest)toast(d.ok?'Volume '+n+'%':(d.error||'Volume change failed'))}catch(e){if(commit&&requestId===volumeRequest)toast('Volume change failed')}}
 function setVolume(v){const n=Math.max(0,Math.min(100,Number(v)||0));if(n>0)lastVolume=n;updateVolumeUI(n);volumeChanging=false;clearTimeout(volumeTimer);sendVolume(n,true)}
 function setupDropdown(){
- const wrap=$('modeSelectWrap'),btn=$('modeSelectButton'),native=$('modeInput');if(!wrap||!btn||!native)return;
- const opts=Array.from(wrap.querySelectorAll('.select-option'));
- function sync(){const selected=opts.find(o=>o.dataset.value===native.value)||opts[0];opts.forEach(o=>o.classList.toggle('selected',o===selected));btn.textContent=selected.textContent}
- opts.forEach(o=>o.onclick=()=>{native.value=o.dataset.value;sync();wrap.classList.remove('open')});
- btn.onclick=e=>{e.stopPropagation();wrap.classList.toggle('open')};
- document.addEventListener('click',e=>{if(!wrap.contains(e.target))wrap.classList.remove('open')});sync()
+ const configs=[
+  [$('modeSelectWrap'),$('modeSelectButton'),$('modeInput')],
+  [$('bufferSelectWrap'),$('bufferSelectButton'),$('bufferInput')]
+ ];
+ configs.forEach(([wrap,btn,native])=>{if(!wrap||!btn||!native)return;const opts=Array.from(wrap.querySelectorAll('.select-option'));function sync(){const selected=opts.find(o=>o.dataset.value===native.value)||opts[0];opts.forEach(o=>o.classList.toggle('selected',o===selected));btn.textContent=selected.textContent}opts.forEach(o=>o.onclick=()=>{native.value=o.dataset.value;sync();wrap.classList.remove('open')});btn.onclick=e=>{e.stopPropagation();wrap.classList.toggle('open')};document.addEventListener('click',e=>{if(!wrap.contains(e.target))wrap.classList.remove('open')});sync()})
 }
 function apply(d){
  text('state',d.state||'—');text('deviceStatus',d.state||'—');
  const formatActive=!!d.formatValid && (d.state==='Buffering'||d.state==='Streaming');
- text('format',formatActive?((d.sampleRate||0)+' Hz · '+(d.bits||0)+'-bit · '+(d.channels===2?'Stereo':'Mono')):'—');
+ const bitsText=formatActive?((d.bits||'—')+' BIT'):'—';const rateText=formatActive?(((Number(d.sampleRate||0)/1000).toFixed(Number(d.sampleRate||0)%1000===0?0:1))+' KHZ'):'—';const channelsText=formatActive?(d.channels===2?'STEREO':'MONO'):'—';
+ text('format',formatActive?((d.sampleRate||0)+' Hz · '+(d.bits||0)+'-bit · '+(d.channels===2?'Stereo':'Mono')):'—');text('formatBits',bitsText);text('formatRate',rateText);text('formatChannels',channelsText);
  text('mode',d.mode||'—');text('host',(d.host||'—')+' · '+(d.mode==='HTTP WAV'?d.httpPort:d.tcpPort));text('session',time(d.sessionSeconds));text('underruns',d.underruns||0);text('reconnects',d.reconnects||0);text('lastError',d.lastError||'None');
+ const connected=!!d.wifiConnected;const streaming=d.state==='Streaming';const bufferPct=Number(d.bufferPercent||0);text('connectionStatus',connected?(streaming?'STREAMING':'CONNECTED'):'OFFLINE');text('bufferHealth',bufferPct>0?'BUFFER '+bufferPct+'%':'BUFFER READY');text('latencyText',(Number($('bufferInput')?.value||15))+' ms');const cd=$('connectionDot'),bd=$('bufferDot');if(cd)cd.className=connected?'good':'bad';if(bd)bd.className=bufferPct>0?'good':'bad';
  const vol=Math.max(0,Math.min(100,Number(d.volume??80)||0)),vi=$('volumeInput');if(vi&&document.activeElement!==vi){vi.value=vol;updateVolumeUI(vol)}
  text('wifiStatus',d.wifiConnected?'Connected':'Disconnected');text('ssid',d.ssid||'—');text('ip',d.ip||'—');text('rssi',d.wifiConnected?(d.rssi+' dBm'):'—');text('version',d.version||'—');text('heap',d.heap?(Math.round(d.heap/1024)+' KB'):'—');
  text('psram',d.psramTotal?((d.psramFree?Math.round(d.psramFree/(1024*1024))+'MB free / ':'')+Math.round(d.psramTotal/(1024*1024))+' MB total'):'8 MB Octal');
  text('cpuTemp',d.cpuTemp!==undefined&&d.cpuTemp!==null?(Number(d.cpuTemp).toFixed(1)+' °C'):'—');
- const p=Number(d.bufferPercent||0);text('bufferText',p+'% · '+(d.bufferBytes?Math.round(d.bufferBytes/1024)+' KB':'0 KB')+' of 4 MB');const c=$('deviceStatus');c.className='chip '+(d.state==='Streaming'?'ok':(d.state==='Stopped'||d.state==='Error'||d.state==='WiFi offline'?'bad':(d.state==='Connecting'?'connecting':'')))
+ const p=Number(d.bufferPercent||0);text('bufferText',p+'% · '+(d.bufferBytes?Math.round(d.bufferBytes/1024)+' KB':'0 KB'));const c=$('deviceStatus');c.className='chip '+(d.state==='Streaming'?'ok':(d.state==='Stopped'||d.state==='Error'||d.state==='WiFi offline'?'bad':(d.state==='Connecting'?'connecting':'')))
 }
 let pollBusy=false;let pollTimer=0;async function poll(){if(pollBusy)return;pollBusy=true;try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw 0;apply(await r.json());if(!cfgLoaded)await loadCfg()}catch(e){text('state','Web lost');text('deviceStatus','Offline');$('deviceStatus').className='chip bad'}finally{pollBusy=false}}function schedulePoll(){clearTimeout(pollTimer);pollTimer=setTimeout(()=>{poll();schedulePoll()},document.visibilityState==='visible'?1000:1500)}
-async function loadCfg(){try{const d=await(await fetch('/api/config',{cache:'no-store'})).json();$('hostInput').value=d.host||'';$('tcpInput').value=d.tcpPort||50005;$('httpInput').value=d.httpPort||8080;$('modeInput').value=d.mode||'tcp';$('bufferInput').value=d.bufferMs||500;$('fallbackInput').checked=!!d.autoFallback;$('autoreconnectInput').checked=!!d.autoReconnect;const v=Math.max(0,Math.min(100,Number(d.volume??80)||0));$('volumeInput').value=v;updateVolumeUI(v);setupDropdown();cfgLoaded=true}catch(e){}}
+async function loadCfg(){try{const d=await(await fetch('/api/config',{cache:'no-store'})).json();$('hostInput').value=d.host||'';$('tcpInput').value=d.tcpPort||50005;$('httpInput').value=d.httpPort||8080;$('modeInput').value=d.mode||'tcp';$('bufferInput').value=d.bufferMs||15;$('fallbackInput').checked=!!d.autoFallback;$('autoreconnectInput').checked=!!d.autoReconnect;const v=Math.max(0,Math.min(100,Number(d.volume??80)||0));$('volumeInput').value=v;updateVolumeUI(v);setupDropdown();cfgLoaded=true}catch(e){}}
 async function act(url){try{const r=await fetch(url,{method:'POST'}),d=await r.json();toast(d.ok?'Done':(d.error||'Failed'));setTimeout(poll,300)}catch(e){toast('Request failed')}}
 async function saveCfg(){const body=new URLSearchParams({host:$('hostInput').value.trim(),tcpPort:$('tcpInput').value,httpPort:$('httpInput').value,bufferMs:$('bufferInput').value,mode:$('modeInput').value,autoFallback:$('fallbackInput').checked?'1':'0',autoReconnect:$('autoreconnectInput').checked?'1':'0',oled:'0'});try{const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const d=await r.json();toast(d.ok?'Saved':'Save failed');cfgLoaded=false;setTimeout(poll,500)}catch(e){toast('Save failed')}}
 function uploadFw(){const f=$('firmware').files[0];if(!f){toast('Choose .bin first');return}if(!confirm('Install '+f.name+'?'))return;const xhr=new XMLHttpRequest(),form=new FormData();form.append('firmware',f);$('otaProg').classList.remove('hidden');$('otaProg').value=0;$('otaTxt').textContent='Uploading…';$('otaBtn').disabled=true;xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);$('otaProg').value=p;$('otaTxt').textContent='Uploading '+p+'%'}};xhr.onload=()=>{$('otaBtn').disabled=false;if(xhr.status===200){$('otaProg').value=100;$('otaTxt').textContent='Update accepted. Restarting…';toast('Firmware update successful')}else{$('otaTxt').textContent='Update failed: '+xhr.responseText;toast('OTA failed')}};xhr.onerror=()=>{$('otaBtn').disabled=false;$('otaTxt').textContent='Upload failed';toast('OTA failed')};xhr.open('POST','/api/ota');xhr.send(form)}
@@ -1391,7 +1427,7 @@ static void setupWebServer() {
     if (tp < 1 || tp > 65535 || hp < 1 || hp > 65535) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid port\"}"); return; }
     settings.phoneHost = host; settings.tcpPort = (uint16_t)tp; settings.httpPort = (uint16_t)hp;
     settings.preferredMode = (server.arg("mode") == "http") ? STREAM_MODE_HTTP : STREAM_MODE_TCP;
-    uint32_t bm = server.arg("bufferMs").toInt(); if (bm < 80 || bm > 3000) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid buffer\"}"); return; }
+    uint32_t bm = server.arg("bufferMs").toInt(); if (bm != 15 && bm != 50 && bm != 150 && bm != 300) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid buffer\"}"); return; }
     settings.autoFallback = (server.arg("autoFallback") == "1"); 
     settings.autoReconnect = (server.arg("autoReconnect") == "1"); 
     settings.oledEnabled = false; 
