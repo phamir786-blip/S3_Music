@@ -526,7 +526,7 @@ static bool connectHttpWav() {
 }
 
 // DRAM Static buffers for Core 1 DMA feeding (8KB output buffer guarantees 0% overflow on any mono-to-stereo expansion)
-static constexpr size_t PLAYBACK_IN_BYTES = 2048;
+static constexpr size_t PLAYBACK_IN_BYTES = 4096;
 static uint8_t playbackIn[PLAYBACK_IN_BYTES];
 static uint8_t playbackOut[PLAYBACK_IN_BYTES * 4];
 
