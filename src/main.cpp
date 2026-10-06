@@ -428,15 +428,10 @@ static bool readTcpFormatHeader() {
   }
 
   if (memcmp(header, "C3MS", 4) != 0) {
-    memcpy(tcpPrefetch, header, 4);
-    tcpPrefetchLen = 4;
-    streamFormat.sampleRate = DEFAULT_SAMPLE_RATE;
-    streamFormat.channels = DEFAULT_CHANNELS;
-    streamFormat.bitsPerSample = DEFAULT_BITS_PER_SAMPLE;
-    streamFormat.audioFormat = 1;
-    streamFormat.valid = true;
-    Serial.println("[TCP] Legacy raw PCM detected (Defaulting to Hi-Res 24-bit 96kHz)");
-    return true;
+    stats.lastError = "Missing C3MS format header";
+    streamFormat.valid = false;
+    Serial.println("[TCP] Missing C3MS format header; rejecting stream");
+    return false;
   }
 
   if (!readExact(streamClient, header + 4, C3_FORMAT_HEADER_BYTES - 4, TCP_FORMAT_HEADER_TIMEOUT_MS)) {
@@ -470,16 +465,10 @@ static bool readTcpFormatHeader() {
     return true;
   }
 
-  // Preserve backwards compatibility
-  memcpy(tcpPrefetch, header, C3_FORMAT_HEADER_BYTES);
-  tcpPrefetchLen = C3_FORMAT_HEADER_BYTES;
-  streamFormat.sampleRate = DEFAULT_SAMPLE_RATE;
-  streamFormat.channels = DEFAULT_CHANNELS;
-  streamFormat.bitsPerSample = DEFAULT_BITS_PER_SAMPLE;
-  streamFormat.audioFormat = 1;
-  streamFormat.valid = true;
-  Serial.println("[TCP] Invalid C3MS header; treating bytes as legacy raw PCM");
-  return true;
+  stats.lastError = "Invalid C3MS format header";
+  streamFormat.valid = false;
+  Serial.println("[TCP] Invalid C3MS format header; rejecting stream");
+  return false;
 }
 
 static bool connectRawTcp() {
