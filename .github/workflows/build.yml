@@ -196,6 +196,14 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload standalone firmware.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware.bin
+          path: artifact/firmware.bin
+          retention-days: 14
+          if-no-files-found: error
+
   release:
     needs: build
     runs-on: ubuntu-24.04
