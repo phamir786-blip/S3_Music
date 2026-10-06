@@ -1263,15 +1263,16 @@ nav .nav-inner button.active:after{
   font-size:11px;
 }
 /* MATCH_NOW_PLAYING_TYPOGRAPHY */
-.tab#wifi .section-title h2,.tab#settings .section-title h2{font-size:16px;letter-spacing:-.018em;font-weight:720}
-.tab#wifi .label,.tab#settings .label{font-size:12px;letter-spacing:0;font-weight:400}
-.tab#wifi .value,.tab#settings .value{font-size:12px;letter-spacing:0;font-weight:400}
-.tab#settings .settings-intro{font-size:10px;letter-spacing:.12em;line-height:1.35}
-.tab#settings .settings-intro strong{font-weight:800}
-.tab#settings .field label{font-size:9px;letter-spacing:.16em;font-weight:800;color:#747984}
-.tab#settings .select-button,.tab#settings .select-option,.tab#settings .switchrow>span,.tab#settings input[type=text],.tab#settings input[type=number],.tab#settings .file{font-size:12px;letter-spacing:0;font-weight:400}
-.tab#wifi button.action,.tab#settings button.action{font-size:9px;letter-spacing:.13em;font-weight:850;text-transform:uppercase}
-.tab#settings .small{font-size:10px;letter-spacing:0;line-height:1.4}
+.tab#wifi,.tab#settings{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.tab#wifi .section-title h2,.tab#settings .section-title h2{font-size:16px;line-height:1.2;letter-spacing:-.018em;font-weight:720}
+.tab#wifi .label,.tab#settings .label{font-size:9px;line-height:1.2;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}
+.tab#wifi .value,.tab#settings .value{font-size:12px;line-height:1.3;letter-spacing:0;color:#ddd;font-weight:400}
+.tab#settings .settings-intro{font-size:10px;line-height:1.4;letter-spacing:.12em;color:#666b76}
+.tab#settings .settings-intro strong{color:#f2f2f4;font-weight:800}
+.tab#settings .field label{font-size:9px;line-height:1.2;letter-spacing:.16em;color:#747984;font-weight:800;text-transform:uppercase}
+.tab#settings .select-button,.tab#settings .select-option,.tab#settings .switchrow>span,.tab#settings input[type=text],.tab#settings input[type=number],.tab#settings .file{font-size:12px;line-height:1.3;letter-spacing:0;font-weight:400}
+.tab#wifi button.action,.tab#settings button.action{font-size:9px;line-height:1.2;letter-spacing:.13em;font-weight:850;text-transform:uppercase}
+.tab#settings .small{font-size:10px;line-height:1.4;letter-spacing:0;color:#5f636d}
 @media(min-width:700px){
   main{padding-left:20px;padding-right:20px}
   .card{padding:22px}
