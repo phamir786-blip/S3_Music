@@ -545,7 +545,7 @@ static bool beginI2S(uint32_t sr, uint16_t ch, uint16_t bits) {
       (bits == 24) ? I2S_BITS_PER_SAMPLE_24BIT :
       I2S_BITS_PER_SAMPLE_32BIT;
 
-  // Ultra-low latency DMA queue: 6 descriptors x 512 bytes in internal SRAM
+  // Ultra-low latency DMA queue: 8 descriptors x 512 bytes in internal SRAM
   // Hardware latency is only ~5ms at 96kHz, while PSRAM provides megabytes of safety cushion!
   i2s_config_t cfg = {
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
@@ -554,7 +554,7 @@ static bool beginI2S(uint32_t sr, uint16_t ch, uint16_t bits) {
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 6,
+    .dma_buf_count = 8,
     .dma_buf_len = 512,
     .use_apll = false,            // ESP32-S3 supports APLL / precise PLL fractional clock
     .tx_desc_auto_clear = true,  // Clear DMA on underrun automatically
