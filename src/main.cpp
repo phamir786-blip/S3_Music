@@ -539,9 +539,11 @@ static bool beginI2S(uint32_t sr, uint16_t ch, uint16_t bits) {
   if (i2sMux) xSemaphoreTake(i2sMux, portMAX_DELAY);
   if (i2sReady) { i2s_driver_uninstall(I2S_NUM_0); i2sReady = false; }
 
-  // Audiophile standard: 16-bit uses 16-bit slots; 24-bit and 32-bit use 32-bit slots
-  // (32-bit slot with MSB-aligned 24-bit data is universally required by PCM5102A, UDA1334A, ES9038, etc.)
-  i2s_bits_per_sample_t bps = (bits == 16) ? I2S_BITS_PER_SAMPLE_16BIT : I2S_BITS_PER_SAMPLE_32BIT;
+  // Keep the host sample width native for 16-bit and 24-bit PCM.
+  i2s_bits_per_sample_t bps =
+      (bits == 16) ? I2S_BITS_PER_SAMPLE_16BIT :
+      (bits == 24) ? I2S_BITS_PER_SAMPLE_24BIT :
+      I2S_BITS_PER_SAMPLE_32BIT;
 
   // Ultra-low latency DMA queue: 6 descriptors x 512 bytes in internal SRAM
   // Hardware latency is only ~5ms at 96kHz, while PSRAM provides megabytes of safety cushion!
@@ -638,43 +640,39 @@ static void playbackTask(void*) {
         writeLen = samples * 4;
       }
     }
-    // --- 24-BIT HIGH-RESOLUTION AUDIO PROCESSING (Packed 3-Byte PCM -> 32-bit I2S Slot) ---
+    // --- 24-BIT NATIVE AUDIO PROCESSING ---
     else if (streamFormat.bitsPerSample == 24) {
-      uint32_t mult = (volume < 100) ? volumeMultiplier(volume) : 65536;
       if (streamFormat.channels == 2) {
-        // Stereo: 6 bytes per frame (3 Left, 3 Right) -> 8 bytes out (32-bit L, 32-bit R)
-        size_t frameCount = n / 6;
-        int32_t *dst = reinterpret_cast<int32_t*>(playbackOut);
-        for (size_t i = 0; i < frameCount; ++i) {
-          size_t idx = i * 6;
-          // Left channel (sign-extended 24-bit)
-          int32_t left = (int32_t)(playbackIn[idx] | (playbackIn[idx + 1] << 8) | (playbackIn[idx + 2] << 16));
-          if (left & 0x800000) left |= 0xFF000000;
-          if (volume < 100) left = (int32_t)(((int64_t)left * mult) >> 16);
-
-          // Right channel (sign-extended 24-bit)
-          int32_t right = (int32_t)(playbackIn[idx + 3] | (playbackIn[idx + 4] << 8) | (playbackIn[idx + 5] << 16));
-          if (right & 0x800000) right |= 0xFF000000;
-          if (volume < 100) right = (int32_t)(((int64_t)right * mult) >> 16);
-
-          // MSB align into 32-bit I2S slot
-          dst[i * 2]     = left << 8;
-          dst[i * 2 + 1] = right << 8;
+        // Keep stereo packed 24-bit PCM as 3-byte samples; only apply volume in place.
+        if (volume < 100) {
+          uint32_t mult = volumeMultiplier(volume);
+          size_t sampleCount = n / 3;
+          for (size_t i = 0; i < sampleCount; ++i) {
+            size_t idx = i * 3;
+            int32_t sample = (int32_t)(playbackIn[idx] |
+                                       (playbackIn[idx + 1] << 8) |
+                                       (playbackIn[idx + 2] << 16));
+            if (sample & 0x800000) sample |= 0xFF000000;
+            sample = (int32_t)(((int64_t)sample * mult) >> 16);
+            playbackIn[idx] = (uint8_t)sample;
+            playbackIn[idx + 1] = (uint8_t)(sample >> 8);
+            playbackIn[idx + 2] = (uint8_t)(sample >> 16);
+          }
         }
-        writeBuf = playbackOut;
-        writeLen = frameCount * 8;
       } else {
-        // Mono: 3 bytes per sample -> Duplicate to Left and Right 32-bit slots (8 bytes out)
+        // Mono still requires stereo expansion for the configured two I2S slots.
+        uint32_t mult = (volume < 100) ? volumeMultiplier(volume) : 65536;
         size_t sampleCount = n / 3;
         int32_t *dst = reinterpret_cast<int32_t*>(playbackOut);
         for (size_t i = 0; i < sampleCount; ++i) {
           size_t idx = i * 3;
-          int32_t s = (int32_t)(playbackIn[idx] | (playbackIn[idx + 1] << 8) | (playbackIn[idx + 2] << 16));
+          int32_t s = (int32_t)(playbackIn[idx] |
+                                (playbackIn[idx + 1] << 8) |
+                                (playbackIn[idx + 2] << 16));
           if (s & 0x800000) s |= 0xFF000000;
           if (volume < 100) s = (int32_t)(((int64_t)s * mult) >> 16);
-
           int32_t slot = s << 8;
-          dst[i * 2]     = slot;
+          dst[i * 2] = slot;
           dst[i * 2 + 1] = slot;
         }
         writeBuf = playbackOut;
