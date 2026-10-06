@@ -33,9 +33,9 @@ static const char FIRMWARE_VERSION[] = "2.0.0-hires";
 
 // I2S Pins optimized for ESP32-S3 (Avoiding Octal Flash/PSRAM GPIO 33-37 & USB CDC GPIO 19-20)
 // Configured for UDA1334A I2S DAC (supports up to 24-bit 96kHz stereo via internal PLL)
-static constexpr int I2S_BCLK_PIN = 4;
-static constexpr int I2S_LRCLK_PIN = 5;
-static constexpr int I2S_DOUT_PIN = 6;
+static constexpr int I2S_BCLK_PIN = 15;
+static constexpr int I2S_LRCLK_PIN = 16;
+static constexpr int I2S_DOUT_PIN = 7;
 
 static constexpr uint16_t TCP_DEFAULT_PORT = 50005;
 static constexpr uint16_t HTTP_DEFAULT_PORT = 8080;
