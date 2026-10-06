@@ -977,7 +977,7 @@ input[type=range]::-moz-range-track{height:5px;background:linear-gradient(90deg,
 .status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}.stat{background:#090909;border:1px solid var(--line);border-radius:16px;padding:13px;min-height:76px}.stat .k{font-size:11px;color:var(--muted);margin-bottom:7px}.stat .v{font-size:17px;font-weight:760;overflow-wrap:anywhere}
 .file{width:100%;padding:12px;border:1px dashed var(--line2);border-radius:15px;background:#070707;color:#bbb}.file::file-selector-button{border:1px solid var(--line2);background:#151515;color:#fff;border-radius:10px;padding:8px 11px;margin-right:9px;font-weight:650}
 progress{width:100%;height:8px;accent-color:#fff;margin-top:12px}
-nav .nav-inner button{font-size:0;line-height:0;display:flex;align-items:center;justify-content:center;position:relative}nav .nav-inner button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}nav .nav-inner button:first-child svg{fill:currentColor;stroke:none;width:18px;height:18px}nav .nav-inner button.active:after{content:"";position:absolute;bottom:5px;left:50%;width:18px;height:2px;border-radius:2px;background:var(--accent);transform:translateX(-50%)} nav{position:fixed;z-index:40;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(0,0,0,.88);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+nav .nav-inner button{font-size:0;line-height:0;display:flex;align-items:center;justify-content:center;position:relative}nav .nav-inner button svg{width:40px;height:40px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}nav .nav-inner button:first-child svg{fill:currentColor;stroke:none;width:36px;height:36px}nav .nav-inner button.active:after{content:"";position:absolute;bottom:5px;left:50%;width:18px;height:2px;border-radius:2px;background:var(--accent);transform:translateX(-50%)} nav{position:fixed;z-index:40;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(0,0,0,.88);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
 nav .nav-inner{width:min(520px,100%);display:flex;gap:6px}nav button{flex:1;min-height:48px;border:0;border-radius:15px;background:transparent;color:#777;font-weight:700;cursor:pointer;transition:background .16s ease,color .16s ease,transform .16s ease}
 nav button.active{background:#151515;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}nav button:active{transform:scale(.97)}
 #toast{position:fixed;z-index:80;left:50%;bottom:88px;transform:translate(-50%,14px);opacity:0;pointer-events:none;background:#f2f2f2;color:#050505;border-radius:14px;padding:11px 15px;font-size:13px;font-weight:700;box-shadow:0 12px 30px rgba(0,0,0,.45);transition:opacity .18s ease,transform .18s ease;max-width:calc(100vw - 28px);text-align:center}
@@ -1278,16 +1278,53 @@ nav .nav-inner button.active:after{
   .tab.active{animation:none}
   button.action:hover{transform:none}
 }
+/* NOW_PLAYING_CONTROL_DECK */
+.deck-card{padding:22px;background:radial-gradient(520px 220px at 50% -40px,rgba(196,215,255,.09),transparent 70%),linear-gradient(180deg,#111216,#090a0c);border-color:rgba(255,255,255,.12);box-shadow:0 18px 46px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.045)}
+.deck-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.deck-kicker{font-size:11px;letter-spacing:.2em;font-weight:850;color:#c9d6ee}.deck-sub{font-size:10px;letter-spacing:.12em;color:#666b76;margin-top:5px}.deck-status{margin-top:1px}
+.deck-state{font-size:clamp(31px,7vw,48px);font-weight:850;letter-spacing:-.055em;margin:30px 0 22px;line-height:1;color:#fff}
+.format-specs{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px}.format-spec{min-height:68px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);border-radius:17px;padding:12px 10px;display:flex;flex-direction:column;justify-content:center}.format-spec strong{font-size:22px;line-height:1;font-weight:850;letter-spacing:-.035em}.format-spec span{font-size:9px;letter-spacing:.15em;color:#777c87;margin-top:7px;font-weight:750}
+.deck-transport{display:flex;align-items:center;justify-content:center;gap:9px;color:#8d929d;font-size:11px;margin:16px 0 18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.deck-transport span:nth-child(2){color:#4f535c}
+.control-deck{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}.control-btn{min-height:82px;border:1px solid rgba(255,255,255,.09);border-radius:19px;background:#0d0e10;color:#b8bdc8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease}.control-btn:hover{transform:translateY(-1px);background:#14161a;border-color:rgba(255,255,255,.18)}.control-btn:active{transform:scale(.97)}.control-icon{font-size:23px;line-height:1;color:#e5e9f0}.control-btn span:last-child{font-size:9px;letter-spacing:.13em;font-weight:850}.control-btn.start{background:linear-gradient(180deg,#171a20,#0d0f12);border-color:rgba(196,215,255,.25);box-shadow:inset 0 0 20px rgba(196,215,255,.035)}.control-btn.start .control-icon{color:#d2e0ff}.control-btn.reconnect .control-icon{font-size:28px}
+.status-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;padding:11px 12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06);color:#747985;font-size:9px;letter-spacing:.05em}.status-strip span{display:flex;align-items:center;gap:6px;min-width:0}.status-strip b{color:#b7bcc6;font-size:9px;font-weight:750;white-space:nowrap}.status-strip i{width:6px;height:6px;border-radius:50%;background:#666;display:inline-block;box-shadow:0 0 8px rgba(255,255,255,.08)}.status-strip i.good{background:#bff6cb;box-shadow:0 0 9px rgba(191,246,203,.45)}.status-strip i.bad{background:#ffb7ae;box-shadow:0 0 9px rgba(255,183,174,.35)}
+.volume-deck{margin-top:12px}.mini-tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.mini-tile{margin:0;min-height:92px}.mini-label{font-size:9px;letter-spacing:.16em;color:#747984;font-weight:800}.mini-value{font-size:20px;font-weight:820;letter-spacing:-.03em;margin-top:9px}.mini-note{font-size:10px;color:#5f636d;margin-top:4px}
+@media(max-width:520px){.deck-card{padding:19px}.deck-state{margin:26px 0 19px}.format-spec{min-height:63px}.format-spec strong{font-size:20px}.control-btn{min-height:76px}.status-strip{font-size:8px;padding:10px 9px}.status-strip b{font-size:8px}.mini-tile{min-height:86px}}
+@media(max-width:390px){.status-strip{gap:5px}.status-strip span{gap:4px}.status-strip span:last-child{display:none}}
+/* END NOW_PLAYING_CONTROL_DECK */
 </style>
 </head>
 <body>
 <main>
 <section class="tab active" id="now">
-<div class="card"><div class="section-title"><h2>Now Playing</h2><span class="chip" id="deviceStatus">Loading</span></div><div class="hero" id="state">Connecting…</div><div class="format-line" id="format">Waiting for status</div><div class="info-strip"><span>PSRAM Buffer</span><strong id="bufferText">—</strong></div>
-<div class="card tight" style="margin:16px 0 0"><div class="slider-head"><h3>Volume</h3><span class="slider-value" id="volumeText">80%</span></div><div class="volume-row"><input id="volumeInput" type="range" min="0" max="100" value="80" oninput="volumePreview(this.value)" onchange="setVolume(this.value)"><button type="button" class="mute-btn" id="muteBtn" onclick="toggleMute()">Mute</button></div><div class="small">Output level (24-bit bit-perfect scale)</div></div>
-<div class="buttons"><button class="action" onclick="act('/api/stream/start')">Start</button><button class="action secondary" onclick="act('/api/stream/stop')">Stop</button><button class="action secondary" onclick="act('/api/stream/reconnect')">Reconnect</button></div></div>
-<div class="card"><div class="section-title"><h2>Stream</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17.5 3.5 14a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0l1.5 1.5M17 6.5 20.5 10a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5 0L12 15.5M8.5 15.5l7-7"/></svg></span></div><div class="row"><span class="label">Transport</span><span class="value" id="mode">—</span></div><div class="row"><span class="label">Source</span><span class="value" id="host">—</span></div><div class="row"><span class="label">Session</span><span class="value" id="session">—</span></div></div>
-<div class="card"><div class="section-title"><h2>Audio health</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 3 8 2-4h7"/></svg></span></div><div class="status-grid"><div class="stat"><div class="k">Underruns</div><div class="v" id="underruns">0</div></div><div class="stat"><div class="k">Reconnects</div><div class="v" id="reconnects">0</div></div></div><div class="row" style="margin-top:8px"><span class="label">Last error</span><span class="value" id="lastError">None</span></div></div>
+<div class="card deck-card">
+  <div class="deck-top"><div><div class="deck-kicker">NOW PLAYING</div><div class="deck-sub">S3 MUSIC RECEIVER</div></div><span class="chip deck-status" id="deviceStatus">Loading</span></div>
+  <div class="deck-state" id="state">Connecting…</div>
+  <div class="format-specs" aria-label="Current audio format">
+    <div class="format-spec"><strong id="formatBits">—</strong><span>BIT</span></div>
+    <div class="format-spec"><strong id="formatRate">—</strong><span>KHZ</span></div>
+    <div class="format-spec wide"><strong id="formatChannels">—</strong><span>CHANNELS</span></div>
+  </div>
+  <div class="deck-transport"><span id="mode">—</span><span>•</span><span id="host">—</span></div>
+  <div class="control-deck">
+    <button class="control-btn start" onclick="act('/api/stream/start')"><span class="control-icon">▶</span><span>START</span></button>
+    <button class="control-btn stop" onclick="act('/api/stream/stop')"><span class="control-icon">■</span><span>STOP</span></button>
+    <button class="control-btn reconnect" onclick="act('/api/stream/reconnect')"><span class="control-icon">↻</span><span>RECONNECT</span></button>
+  </div>
+  <div class="status-strip"><span><i id="connectionDot"></i><b id="connectionStatus">Checking connection</b></span><span><i id="bufferDot"></i><b id="bufferHealth">Buffer —</b></span><span>LATENCY <b id="latencyText">15 ms</b></span></div>
+</div>
+<div class="card tight volume-deck">
+  <div class="slider-head"><h3>Volume</h3><span class="slider-value" id="volumeText">80%</span></div>
+  <div class="volume-row"><input id="volumeInput" type="range" min="0" max="100" value="80" oninput="volumePreview(this.value)" onchange="setVolume(this.value)"><button type="button" class="mute-btn" id="muteBtn" onclick="toggleMute()">Mute</button></div>
+  <div class="small">Output level · 0–100% linear gain</div>
+</div>
+<div class="mini-tile-grid">
+  <div class="card mini-tile"><div class="mini-label">BUFFER</div><div class="mini-value" id="bufferText">—</div><div class="mini-note">PSRAM ring</div></div>
+  <div class="card mini-tile"><div class="mini-label">SESSION</div><div class="mini-value" id="session">—</div><div class="mini-note">Current stream</div></div>
+</div>
+<div class="card">
+  <div class="section-title"><h2>Stream health</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 3 8 2-4h7"/></svg></span></div>
+  <div class="status-grid"><div class="stat"><div class="k">Underruns</div><div class="v" id="underruns">0</div></div><div class="stat"><div class="k">Reconnects</div><div class="v" id="reconnects">0</div></div></div>
+  <div class="row" style="margin-top:8px"><span class="label">Last error</span><span class="value" id="lastError">None</span></div>
+</div>
 </section>
 <section class="tab" id="wifi"><div class="card"><div class="section-title"><h2>Wi‑Fi</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9.5a12.5 12.5 0 0 1 16 0M7.2 13a7.5 7.5 0 0 1 9.6 0M10.3 16.2a2.8 2.8 0 0 1 3.4 0M12 19h.01"/></svg></span></div><div class="row"><span class="label">Status</span><span class="value" id="wifiStatus">—</span></div><div class="row"><span class="label">SSID</span><span class="value" id="ssid">—</span></div><div class="row"><span class="label">IP</span><span class="value" id="ip">—</span></div><div class="row"><span class="label">Hostname</span><span class="value">s3music.local</span></div><div class="row"><span class="label">Signal</span><span class="value" id="rssi">—</span></div><div class="buttons"><button class="action" onclick="act('/api/wifi/reconnect')">Reconnect Wi‑Fi</button></div></div></section>
 <section class="tab" id="settings">
@@ -1322,8 +1359,10 @@ function setupDropdown(){
 function apply(d){
  text('state',d.state||'—');text('deviceStatus',d.state||'—');
  const formatActive=!!d.formatValid && (d.state==='Buffering'||d.state==='Streaming');
- text('format',formatActive?((d.sampleRate||0)+' Hz · '+(d.bits||0)+'-bit · '+(d.channels===2?'Stereo':'Mono')):'—');
+ const bitsText=formatActive?(d.bits||'—'):'—';const rateText=formatActive?((Number(d.sampleRate||0)/1000).toFixed(Number(d.sampleRate||0)%1000===0?0:1)):'—';const channelsText=formatActive?(d.channels===2?'STEREO':'MONO'):'—';
+ text('format',formatActive?((d.sampleRate||0)+' Hz · '+(d.bits||0)+'-bit · '+(d.channels===2?'Stereo':'Mono')):'—');text('formatBits',bitsText);text('formatRate',rateText);text('formatChannels',channelsText);
  text('mode',d.mode||'—');text('host',(d.host||'—')+' · '+(d.mode==='HTTP WAV'?d.httpPort:d.tcpPort));text('session',time(d.sessionSeconds));text('underruns',d.underruns||0);text('reconnects',d.reconnects||0);text('lastError',d.lastError||'None');
+ const connected=!!d.wifiConnected;const streaming=d.state==='Streaming';const bufferPct=Number(d.bufferPercent||0);text('connectionStatus',connected?(streaming?'STREAMING':'CONNECTED'):'OFFLINE');text('bufferHealth',bufferPct>0?'BUFFER '+bufferPct+'%':'BUFFER READY');text('latencyText',(Number($('bufferInput')?.value||15))+' ms');const cd=$('connectionDot'),bd=$('bufferDot');if(cd)cd.className=connected?'good':'bad';if(bd)bd.className=bufferPct>0?'good':'bad';
  const vol=Math.max(0,Math.min(100,Number(d.volume??80)||0)),vi=$('volumeInput');if(vi&&document.activeElement!==vi){vi.value=vol;updateVolumeUI(vol)}
  text('wifiStatus',d.wifiConnected?'Connected':'Disconnected');text('ssid',d.ssid||'—');text('ip',d.ip||'—');text('rssi',d.wifiConnected?(d.rssi+' dBm'):'—');text('version',d.version||'—');text('heap',d.heap?(Math.round(d.heap/1024)+' KB'):'—');
  text('psram',d.psramTotal?((d.psramFree?Math.round(d.psramFree/(1024*1024))+'MB free / ':'')+Math.round(d.psramTotal/(1024*1024))+' MB total'):'8 MB Octal');
