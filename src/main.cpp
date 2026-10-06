@@ -95,7 +95,7 @@ struct Settings {
   uint16_t httpPort = HTTP_DEFAULT_PORT;
   StreamMode preferredMode = STREAM_MODE_TCP;
   bool autoFallback = true, autoReconnect = true, oledEnabled = false, streamEnabled = true;
-  uint16_t targetBufferMs = 500;
+  uint16_t targetBufferMs = 15;
   uint8_t volumePercent = 80;
 };
 
@@ -138,14 +138,13 @@ static void loadSettings() {
   settings.autoReconnect = preferences.getBool("autorecon", true);
   settings.oledEnabled = false; // OLED purged
   settings.streamEnabled = preferences.getBool("enabled", true);
-  settings.targetBufferMs = preferences.getUShort("buffer", 500);
+  settings.targetBufferMs = preferences.getUShort("buffer", 15);
   settings.volumePercent = preferences.getUChar("volume", 80);
   if (settings.volumePercent > 100) settings.volumePercent = 100;
   if (settings.phoneHost.length() == 0) settings.phoneHost = PHONE_HOST;
   if (settings.tcpPort == 0) settings.tcpPort = TCP_DEFAULT_PORT;
   if (settings.httpPort == 0) settings.httpPort = HTTP_DEFAULT_PORT;
-  if (settings.targetBufferMs < 80) settings.targetBufferMs = 80;
-  if (settings.targetBufferMs > 3000) settings.targetBufferMs = 3000;
+  if (settings.targetBufferMs != 15 && settings.targetBufferMs != 50 && settings.targetBufferMs != 150 && settings.targetBufferMs != 300) settings.targetBufferMs = 15;
 }
 
 static void saveSettings() {
@@ -169,7 +168,7 @@ static void resetSettings() {
   settings.preferredMode = STREAM_MODE_TCP;
   settings.autoFallback = true; settings.autoReconnect = true;
   settings.oledEnabled = false; settings.streamEnabled = true;
-  settings.targetBufferMs = 500;
+  settings.targetBufferMs = 15;
   settings.volumePercent = 80;
   preferences.begin("s3music", false); saveSettings();
 }
@@ -1295,7 +1294,7 @@ nav .nav-inner button.active:after{
 <div class="settings-intro"><strong>Settings</strong> · Connection, hardware, firmware and system controls</div>
 <div class="card"><div class="section-title"><h2>Stream settings</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17.5 3.5 14a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0l1.5 1.5M17 6.5 20.5 10a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5 0L12 15.5M8.5 15.5l7-7"/></svg></span></div><div class="field"><label>Phone host / IP</label><input id="hostInput" type="text" autocomplete="off"></div>
 <div class="field"><label>Preferred stream</label><div class="select-wrap" id="modeSelectWrap"><button type="button" class="select-button" id="modeSelectButton">Raw TCP PCM (24-bit 96k) — port 50005</button><div class="select-menu" role="listbox"><button type="button" class="select-option selected" data-value="tcp">Raw TCP PCM — port 50005</button><button type="button" class="select-option" data-value="http">HTTP WAV/PCM — port 8080</button></div><select id="modeInput" class="select-native" aria-hidden="true" tabindex="-1"><option value="tcp">Raw TCP PCM — port 50005</option><option value="http">HTTP WAV/PCM — port 8080</option></select></div></div>
-<div class="field"><label>TCP port</label><input id="tcpInput" type="number" min="1" max="65535"></div><div class="field"><label>HTTP port</label><input id="httpInput" type="number" min="1" max="65535"></div><div class="field"><label>Target buffer (ms)</label><input id="bufferInput" type="number" min="80" max="3000" step="50"></div>
+<div class="field"><label>TCP port</label><input id="tcpInput" type="number" min="1" max="65535"></div><div class="field"><label>HTTP port</label><input id="httpInput" type="number" min="1" max="65535"></div><div class="field"><label>Target buffer (ms)</label><div class="select-wrap" id="bufferSelectWrap"><button type="button" class="select-button" id="bufferSelectButton">15 ms</button><div class="select-menu" role="listbox"><button type="button" class="select-option selected" data-value="15">15 ms</button><button type="button" class="select-option" data-value="50">50 ms</button><button type="button" class="select-option" data-value="150">150 ms</button><button type="button" class="select-option" data-value="300">300 ms</button></div><select id="bufferInput" class="select-native" aria-hidden="true" tabindex="-1"><option value="15">15 ms</option><option value="50">50 ms</option><option value="150">150 ms</option><option value="300">300 ms</option></select></div></div>
 <div class="switchrow"><span>Automatic TCP/HTTP fallback</span><input class="switch" id="fallbackInput" type="checkbox"></div><div class="switchrow"><span>Automatic stream reconnect</span><input class="switch" id="autoreconnectInput" type="checkbox"></div><div class="buttons"><button class="action" onclick="saveCfg()">Save and reconnect</button></div></div>
 <div class="card"><div class="section-title"><h2>Hardware & Memory</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 7h6M9 17h6"/></svg></span></div><div class="row"><span class="label">SoC Architecture</span><span class="value">ESP32-S3 Dual-Core 240MHz</span></div><div class="row"><span class="label">Octal PSRAM</span><span class="value" id="psram">—</span></div><div class="row"><span class="label">Free Internal Heap</span><span class="value" id="heap">—</span></div><div class="row"><span class="label">Firmware</span><span class="value" id="version">—</span></div><div class="row"><span class="label">Audio Pipeline</span><span class="value">Core 1 DMA (Headless Hi-Fi)</span></div><div class="row"><span class="label">CPU temperature</span><span class="value" id="cpuTemp">—</span></div></div>
 <div class="card"><div class="section-title"><h2>Firmware OTA</h2><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M6 15v4h12v-4"/></svg></span></div><p class="small">Select a .bin file. Streaming will stop during update.</p><input id="firmware" class="file" type="file" accept=".bin"><div class="buttons"><button class="action" id="otaBtn" onclick="uploadFw()">Install firmware</button></div><progress id="otaProg" class="hidden" value="0" max="100"></progress><div class="small" id="otaTxt"></div></div>
@@ -1314,12 +1313,11 @@ function toggleMute(){const input=$('volumeInput');if(!input)return;const curren
 async function sendVolume(v,commit){const n=Math.max(0,Math.min(100,Number(v)||0));const requestId=++volumeRequest;try{const body=new URLSearchParams({value:String(n),commit:commit?'1':'0'});const r=await fetch('/api/volume',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const d=await r.json();if(commit&&requestId===volumeRequest)toast(d.ok?'Volume '+n+'%':(d.error||'Volume change failed'))}catch(e){if(commit&&requestId===volumeRequest)toast('Volume change failed')}}
 function setVolume(v){const n=Math.max(0,Math.min(100,Number(v)||0));if(n>0)lastVolume=n;updateVolumeUI(n);volumeChanging=false;clearTimeout(volumeTimer);sendVolume(n,true)}
 function setupDropdown(){
- const wrap=$('modeSelectWrap'),btn=$('modeSelectButton'),native=$('modeInput');if(!wrap||!btn||!native)return;
- const opts=Array.from(wrap.querySelectorAll('.select-option'));
- function sync(){const selected=opts.find(o=>o.dataset.value===native.value)||opts[0];opts.forEach(o=>o.classList.toggle('selected',o===selected));btn.textContent=selected.textContent}
- opts.forEach(o=>o.onclick=()=>{native.value=o.dataset.value;sync();wrap.classList.remove('open')});
- btn.onclick=e=>{e.stopPropagation();wrap.classList.toggle('open')};
- document.addEventListener('click',e=>{if(!wrap.contains(e.target))wrap.classList.remove('open')});sync()
+ const configs=[
+  [$('modeSelectWrap'),$('modeSelectButton'),$('modeInput')],
+  [$('bufferSelectWrap'),$('bufferSelectButton'),$('bufferInput')]
+ ];
+ configs.forEach(([wrap,btn,native])=>{if(!wrap||!btn||!native)return;const opts=Array.from(wrap.querySelectorAll('.select-option'));function sync(){const selected=opts.find(o=>o.dataset.value===native.value)||opts[0];opts.forEach(o=>o.classList.toggle('selected',o===selected));btn.textContent=selected.textContent}opts.forEach(o=>o.onclick=()=>{native.value=o.dataset.value;sync();wrap.classList.remove('open')});btn.onclick=e=>{e.stopPropagation();wrap.classList.toggle('open')};document.addEventListener('click',e=>{if(!wrap.contains(e.target))wrap.classList.remove('open')});sync()})
 }
 function apply(d){
  text('state',d.state||'—');text('deviceStatus',d.state||'—');
@@ -1333,7 +1331,7 @@ function apply(d){
  const p=Number(d.bufferPercent||0);text('bufferText',p+'% · '+(d.bufferBytes?Math.round(d.bufferBytes/1024)+' KB':'0 KB')+' of 4 MB');const c=$('deviceStatus');c.className='chip '+(d.state==='Streaming'?'ok':(d.state==='Stopped'||d.state==='Error'||d.state==='WiFi offline'?'bad':(d.state==='Connecting'?'connecting':'')))
 }
 let pollBusy=false;let pollTimer=0;async function poll(){if(pollBusy)return;pollBusy=true;try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw 0;apply(await r.json());if(!cfgLoaded)await loadCfg()}catch(e){text('state','Web lost');text('deviceStatus','Offline');$('deviceStatus').className='chip bad'}finally{pollBusy=false}}function schedulePoll(){clearTimeout(pollTimer);pollTimer=setTimeout(()=>{poll();schedulePoll()},document.visibilityState==='visible'?1000:1500)}
-async function loadCfg(){try{const d=await(await fetch('/api/config',{cache:'no-store'})).json();$('hostInput').value=d.host||'';$('tcpInput').value=d.tcpPort||50005;$('httpInput').value=d.httpPort||8080;$('modeInput').value=d.mode||'tcp';$('bufferInput').value=d.bufferMs||500;$('fallbackInput').checked=!!d.autoFallback;$('autoreconnectInput').checked=!!d.autoReconnect;const v=Math.max(0,Math.min(100,Number(d.volume??80)||0));$('volumeInput').value=v;updateVolumeUI(v);setupDropdown();cfgLoaded=true}catch(e){}}
+async function loadCfg(){try{const d=await(await fetch('/api/config',{cache:'no-store'})).json();$('hostInput').value=d.host||'';$('tcpInput').value=d.tcpPort||50005;$('httpInput').value=d.httpPort||8080;$('modeInput').value=d.mode||'tcp';$('bufferInput').value=d.bufferMs||15;$('fallbackInput').checked=!!d.autoFallback;$('autoreconnectInput').checked=!!d.autoReconnect;const v=Math.max(0,Math.min(100,Number(d.volume??80)||0));$('volumeInput').value=v;updateVolumeUI(v);setupDropdown();cfgLoaded=true}catch(e){}}
 async function act(url){try{const r=await fetch(url,{method:'POST'}),d=await r.json();toast(d.ok?'Done':(d.error||'Failed'));setTimeout(poll,300)}catch(e){toast('Request failed')}}
 async function saveCfg(){const body=new URLSearchParams({host:$('hostInput').value.trim(),tcpPort:$('tcpInput').value,httpPort:$('httpInput').value,bufferMs:$('bufferInput').value,mode:$('modeInput').value,autoFallback:$('fallbackInput').checked?'1':'0',autoReconnect:$('autoreconnectInput').checked?'1':'0',oled:'0'});try{const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const d=await r.json();toast(d.ok?'Saved':'Save failed');cfgLoaded=false;setTimeout(poll,500)}catch(e){toast('Save failed')}}
 function uploadFw(){const f=$('firmware').files[0];if(!f){toast('Choose .bin first');return}if(!confirm('Install '+f.name+'?'))return;const xhr=new XMLHttpRequest(),form=new FormData();form.append('firmware',f);$('otaProg').classList.remove('hidden');$('otaProg').value=0;$('otaTxt').textContent='Uploading…';$('otaBtn').disabled=true;xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);$('otaProg').value=p;$('otaTxt').textContent='Uploading '+p+'%'}};xhr.onload=()=>{$('otaBtn').disabled=false;if(xhr.status===200){$('otaProg').value=100;$('otaTxt').textContent='Update accepted. Restarting…';toast('Firmware update successful')}else{$('otaTxt').textContent='Update failed: '+xhr.responseText;toast('OTA failed')}};xhr.onerror=()=>{$('otaBtn').disabled=false;$('otaTxt').textContent='Upload failed';toast('OTA failed')};xhr.open('POST','/api/ota');xhr.send(form)}
@@ -1382,7 +1380,7 @@ static void setupWebServer() {
     if (tp < 1 || tp > 65535 || hp < 1 || hp > 65535) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid port\"}"); return; }
     settings.phoneHost = host; settings.tcpPort = (uint16_t)tp; settings.httpPort = (uint16_t)hp;
     settings.preferredMode = (server.arg("mode") == "http") ? STREAM_MODE_HTTP : STREAM_MODE_TCP;
-    uint32_t bm = server.arg("bufferMs").toInt(); if (bm < 80 || bm > 3000) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid buffer\"}"); return; }
+    uint32_t bm = server.arg("bufferMs").toInt(); if (bm != 15 && bm != 50 && bm != 150 && bm != 300) { sendJson(400, "{\"ok\":false,\"error\":\"Invalid buffer\"}"); return; }
     settings.autoFallback = (server.arg("autoFallback") == "1"); 
     settings.autoReconnect = (server.arg("autoReconnect") == "1"); 
     settings.oledEnabled = false; 
