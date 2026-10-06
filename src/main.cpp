@@ -61,21 +61,12 @@ static constexpr uint32_t HTTP_HEADER_TIMEOUT_MS = 8000;
 static constexpr uint32_t STREAM_READ_TIMEOUT_MS = 15000;
 static constexpr uint32_t WAV_PARSE_MAX_BYTES = 4096;
 
-// 101-step Perceptual Logarithmic Volume Attenuation Curve (16-bit multipliers: 0 to 65536)
-// Provides studio-grade smooth volume taper from -60 dB to 0 dB (Bit-perfect at 100%)
-static const uint32_t LOG_VOL_TABLE[101] = {
-      0,    41,    43,    45,    48,    51,    53,    56,    60,    63,
-     67,    71,    75,    80,    84,    89,    95,   101,   107,   113,
-    120,   128,   135,   144,   153,   162,   172,   183,   194,   206,
-    219,   233,   247,   262,   279,   296,   314,   334,   355,   377,
-    400,   425,   452,   480,   510,   542,   576,   612,   651,   691,
-    735,   781,   830,   882,   938,   997,  1060,  1126,  1197,  1273,
-   1353,  1439,  1530,  1627,  1730,  1839,  1956,  2080,  2212,  2352,
-   2501,  2659,  2828,  3007,  3198,  3401,  3617,  3846,  4090,  4350,
-   4626,  4919,  5231,  5563,  5916,  6291,  6691,  7115,  7567,  8047,
-   8558,  9101,  9679, 10293, 10947, 11641, 12380, 13166, 14002, 14891,
-  65536 // 100% -> Bit-perfect unity bypass
-};
+// Simple 0-100% linear amplitude gain.
+// 0% = silence, 100% = unity gain (bit-perfect bypass).
+static inline uint32_t volumeMultiplier(uint8_t volume) {
+  if (volume >= 100) return 65536;
+  return ((uint32_t)volume * 65536UL) / 100UL;
+}
 
 enum StreamMode : uint8_t { STREAM_MODE_TCP = 0, STREAM_MODE_HTTP = 1 };
 enum ReceiverState : uint8_t {
@@ -628,7 +619,7 @@ static void playbackTask(void*) {
     // --- 16-BIT AUDIO PROCESSING ---
     if (streamFormat.bitsPerSample == 16) {
       if (volume < 100) {
-        uint32_t mult = LOG_VOL_TABLE[volume];
+        uint32_t mult = volumeMultiplier(volume);
         int16_t *samples = reinterpret_cast<int16_t*>(playbackIn);
         size_t sampleCount = n / sizeof(int16_t);
         for (size_t i = 0; i < sampleCount; ++i) {
@@ -650,7 +641,7 @@ static void playbackTask(void*) {
     }
     // --- 24-BIT HIGH-RESOLUTION AUDIO PROCESSING (Packed 3-Byte PCM -> 32-bit I2S Slot) ---
     else if (streamFormat.bitsPerSample == 24) {
-      uint32_t mult = (volume < 100) ? LOG_VOL_TABLE[volume] : 65536;
+      uint32_t mult = (volume < 100) ? volumeMultiplier(volume) : 65536;
       if (streamFormat.channels == 2) {
         // Stereo: 6 bytes per frame (3 Left, 3 Right) -> 8 bytes out (32-bit L, 32-bit R)
         size_t frameCount = n / 6;
@@ -699,7 +690,7 @@ static void playbackTask(void*) {
 
       // 2. Volume attenuation loop (optional inner check)
       if (volume < 100) {
-        uint32_t mult = LOG_VOL_TABLE[volume];
+        uint32_t mult = volumeMultiplier(volume);
         for (size_t i = 0; i < sampleCount32; ++i) {
           samples32[i] = (int32_t)(((int64_t)samples32[i] * mult) >> 16);
         }
