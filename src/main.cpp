@@ -703,12 +703,12 @@ static void playbackTask(void*) {
       }
       if (streamFormat.channels == 1) {
         int32_t *dst = reinterpret_cast<int32_t*>(playbackOut);
-        for (size_t i = 0; i < sampleCount; i++) {
-          dst[i * 2]     = samples[i];
-          dst[i * 2 + 1] = samples[i];
+        for (size_t i = 0; i < sampleCount32; i++) {
+          dst[i * 2]     = samples32[i];
+          dst[i * 2 + 1] = samples32[i];
         }
         writeBuf = playbackOut;
-        writeLen = sampleCount * 8;
+        writeLen = sampleCount32 * 8;
       }
     }
 
