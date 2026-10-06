@@ -691,16 +691,21 @@ static void playbackTask(void*) {
         writeLen = sampleCount * 8;
       }
     }
-    // --- 32-BIT HIGH-RESOLUTION AUDIO PROCESSING ---
+   // --- 32-BIT HIGH-RESOLUTION AUDIO PROCESSING ---
     else if (streamFormat.bitsPerSample == 32) {
+      // 1. Declare them here so they stay alive for the entire 32-bit block
+      int32_t *samples32 = reinterpret_cast<int32_t*>(playbackIn);
+      size_t sampleCount32 = n / sizeof(int32_t);
+
+      // 2. Volume attenuation loop (optional inner check)
       if (volume < 100) {
         uint32_t mult = LOG_VOL_TABLE[volume];
-        int32_t *samples = reinterpret_cast<int32_t*>(playbackIn);
-        size_t sampleCount = n / sizeof(int32_t);
-        for (size_t i = 0; i < sampleCount; ++i) {
-          samples[i] = (int32_t)(((int64_t)samples[i] * mult) >> 16);
+        for (size_t i = 0; i < sampleCount32; ++i) {
+          samples32[i] = (int32_t)(((int64_t)samples32[i] * mult) >> 16);
         }
       }
+
+      // 3. Mono-to-stereo expansion loop (now safely in scope!)
       if (streamFormat.channels == 1) {
         int32_t *dst = reinterpret_cast<int32_t*>(playbackOut);
         for (size_t i = 0; i < sampleCount32; i++) {
@@ -711,7 +716,6 @@ static void playbackTask(void*) {
         writeLen = sampleCount32 * 8;
       }
     }
-
     if (i2sMux) xSemaphoreTake(i2sMux, portMAX_DELAY);
     bool ready = i2sReady;
     size_t w = 0;
